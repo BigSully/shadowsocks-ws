@@ -23,7 +23,7 @@ var (
 	space   = []byte{' '}
 )
 
-type WSConn struct {
+type Conn struct {
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
@@ -31,28 +31,22 @@ type WSConn struct {
 
 	// Buffered channel of inbound messages.
 	Recv chan []byte
-}
 
-func (c *WSConn) Close() error {
-	return c.conn.Close()
+	*Cipher
 }
 
 // Dial: addr should be in the form of host:port
-func Dial(addr string) (conn *WSConn, err error) {
+func Dial(addr string, cipher *Cipher) (conn *Conn, err error) {
 	c, _, err := websocket.DefaultDialer.Dial(addr, nil)
 	if err != nil {
 		return
 	}
 
-	return WrapConn(c), nil
-}
-
-// Dial: addr should be in the form of host:port
-func WrapConn(c *websocket.Conn) (conn *WSConn) {
-	conn = &WSConn{
-		conn: c,
-		Send: make(chan []byte, 256),
-		Recv: make(chan []byte, 256)}
+	conn = &Conn{
+		conn:   c,
+		Send:   make(chan []byte, 256),
+		Recv:   make(chan []byte, 256),
+		Cipher: cipher}
 
 	go conn.writePump()
 	go conn.readPump()
@@ -60,10 +54,14 @@ func WrapConn(c *websocket.Conn) (conn *WSConn) {
 	return
 }
 
+func (c Conn) Close() error {
+	return c.conn.Close()
+}
+
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *WSConn) readPump() {
+func (c *Conn) readPump() {
 	defer func() {
 		c.conn.Close()
 	}()
@@ -84,7 +82,7 @@ func (c *WSConn) readPump() {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *WSConn) writePump() {
+func (c *Conn) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -110,39 +108,15 @@ func (c *WSConn) writePump() {
 	}
 }
 
-func (c *WSConn) Write(b []byte) (n int, err error) {
-	c.Send <- b
-	n = len(b)
-
-	return
-}
-
-type Conn struct {
-	wsConn *WSConn
-	*Cipher
-}
-
-func NewConn(wsConn *WSConn, cipher *Cipher) (conn *Conn) {
-	conn = &Conn{
-		wsConn: wsConn,
-		Cipher: cipher}
-
-	return
-}
-
-func (c Conn) Close() error {
-	return c.wsConn.Close()
-}
-
 func (c Conn) ReadAll() (b []byte, n int, err error) {
-	b = <-c.wsConn.Recv // block if no data is available
+	b = <-c.Recv // block if no data is available
 	n = len(b)
 
 	return
 }
 
 func (c Conn) Write(p []byte) (n int, err error) {
-	c.wsConn.Send <- p
+	c.Send <- p
 	n = len(p)
 
 	return

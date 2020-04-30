@@ -73,30 +73,23 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			cipher, err := ws.NewCipher(method, password)
 
 			//rc, err := net.Dial("tcp", server)
-			wsConn, err := ws.Dial(wsAddr)
+			conn, err := ws.Dial(wsAddr, cipher)
 			if err != nil {
 				logf("failed to connect to server2 %v: %v", wsAddr, err)
 				return
 			}
-			defer wsConn.Close()
-
-			newConn := ws.NewConn(wsConn, cipher)
-			if err != nil {
-				logger.Println("error connecting to shadowsocks server:", err)
-				return
-			}
+			defer conn.Close()
 
 			//rc.(*net.TCPConn).SetKeepAlive(true)  // TODO: pinging
 			//rc = shadow(rc)   // TODO: encryption  can be skipped for the moment
 
 			// tell the distant server the real server we want to access and help the distant server initialize a new connection
-			if _, err = newConn.Write(tgt); err != nil {
-				wsConn.Close()
+			if _, err = conn.Write(tgt); err != nil {
 				return
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			relayws(*newConn, c)
+			relayws(*conn, c)
 			//relay3(*raw, c)
 
 			//if err != nil {
