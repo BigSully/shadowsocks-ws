@@ -1,10 +1,12 @@
 package main
 
 import (
+	"github.com/BigSully/shadowsocks-ws/websocket"
 	"io"
 	"net"
 	"time"
 
+	ss "github.com/BigSully/shadowsocks-ws/shadowsocks"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
@@ -64,28 +66,59 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 
-			rc, err := net.Dial("tcp", server)
+			//wsAddr := fmt.Sprintf("ws://%v:%v/", config["server"], config["server_port"])
+			wsAddr := "ws://localhost:3000/"
+			method := "aes-256-cfb"
+			password := "123456"
+			cipher, err := ss.NewCipher(method, password)
+
+			//rc, err := net.Dial("tcp", server)
+			wsConn, err := ws.Dial(wsAddr)
 			if err != nil {
-				logf("failed to connect to server %v: %v", server, err)
+				logf("failed to connect to server2 %v: %v", wsAddr, err)
 				return
 			}
-			defer rc.Close()
-			rc.(*net.TCPConn).SetKeepAlive(true)
-			rc = shadow(rc)
+			defer wsConn.Close()
 
-			if _, err = rc.Write(tgt); err != nil {
-				logf("failed to send target address: %v", err)
+			newConn := ss.NewConn(wsConn, cipher)
+			if err != nil {
+				logger.Println("error connecting to shadowsocks server:", err)
+				return
+			}
+
+			//rc.(*net.TCPConn).SetKeepAlive(true)  // TODO: pinging
+			//rc = shadow(rc)   // TODO: encryption  can be skipped for the moment
+
+			// tell the distant server the real server we want to access and help the distant server initialize a new connection
+			if _, err = newConn.Write(tgt); err != nil {
+				wsConn.Close()
 				return
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			_, _, err = relay(rc, c)
-			if err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					return // ignore i/o timeout
-				}
-				logf("relay error: %v", err)
-			}
+			relayws(*newConn, c)
+
+			//if err != nil {
+			//	logf("failed to connect to server %v: %v", server, err)
+			//	return
+			//}
+			//defer rc.Close()
+			//rc.(*net.TCPConn).SetKeepAlive(true)
+			//rc = shadow(rc)
+			//
+			//if _, err = rc.Write(tgt); err != nil {
+			//	logf("failed to send target address: %v", err)
+			//	return
+			//}
+			//
+			//logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
+			//_, _, err = relay(rc, c)
+			//if err != nil {
+			//	if err, ok := err.(net.Error); ok && err.Timeout() {
+			//		return // ignore i/o timeout
+			//	}
+			//	logf("relay error: %v", err)
+			//}
 		}()
 	}
 }
@@ -135,6 +168,38 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			}
 		}()
 	}
+}
+
+// relay copies between left and right bidirectionally. Returns number of
+// bytes copied from right to left, from left to right, and any error occurred.
+func relayws(left ss.Conn, right net.Conn) {
+	type res struct {
+		N   int64
+		Err error
+	}
+	//ch := make(chan res)
+
+	go ss.PipeNet2WS(right, left)
+	ss.PipeWS2Net(left, right)
+	//logger.Println("closed connection to", hostPort)
+
+	//
+	//go func() {
+	//	n, err := io.Copy(right, left)
+	//	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+	//	//left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
+	//	ch <- res{n, err}
+	//}()
+	//
+	//n, err := io.Copy(left, right)
+	//right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+	////left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
+	//rs := <-ch
+	//
+	//if err == nil {
+	//	err = rs.Err
+	//}
+	//return n, rs.N, err
 }
 
 // relay copies between left and right bidirectionally. Returns number of
