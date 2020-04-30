@@ -95,7 +95,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			relayws(*newConn, c)
+			relay2(*newConn, c)
 
 			//if err != nil {
 			//	logf("failed to connect to server %v: %v", server, err)
@@ -167,6 +167,33 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			}
 		}()
 	}
+}
+
+// relay copies between left and right bidirectionally. Returns number of
+// bytes copied from right to left, from left to right, and any error occurred.
+func relay2(left ws.Conn, right net.Conn) (int64, int64, error) {
+	type res struct {
+		N   int64
+		Err error
+	}
+	ch := make(chan res)
+
+	go func() {
+		n, err := io.Copy(right, left)
+		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+		//left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
+		ch <- res{n, err}
+	}()
+
+	n, err := io.Copy(left, right)
+	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+	//left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
+	rs := <-ch
+
+	if err == nil {
+		err = rs.Err
+	}
+	return n, rs.N, err
 }
 
 // relay copies between left and right bidirectionally. Returns number of

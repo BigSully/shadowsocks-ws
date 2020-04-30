@@ -2,6 +2,7 @@ package ws
 
 import (
 	"github.com/gorilla/websocket"
+	//"io"
 	"log"
 	"time"
 )
@@ -131,20 +132,33 @@ func NewConn(wsConn *WSConn, cipher *Cipher) (conn *Conn) {
 	return
 }
 
-func (c *Conn) Close() error {
+func (c Conn) Close() error {
 	return c.wsConn.Close()
 }
 
-func (c *Conn) ReadAll() (b []byte, n int, err error) {
+func (c Conn) ReadAll() (b []byte, n int, err error) {
 	b = <-c.wsConn.Recv // block if no data is available
 	n = len(b)
 
 	return
 }
 
-func (c *Conn) Write(b []byte) (n int, err error) {
-	c.wsConn.Send <- b
-	n = len(b)
+func (c Conn) Read(p []byte) (n int, err error) {
+	bytes := <-c.wsConn.Recv // block if no data is available
+
+	//if r.readIndex >= int64(len(r.data)) {  // how to EOF
+	//	err = io.EOF
+	//	return
+	//}
+
+	n = copy(p, bytes)
+	return
+
+}
+
+func (c Conn) Write(p []byte) (n int, err error) {
+	c.wsConn.Send <- p
+	n = len(p)
 
 	return
 }
