@@ -54,11 +54,29 @@ func Dial(addr string, cipher *Cipher) (conn *Conn, err error) {
 	go conn.writePump()
 	go conn.readPump()
 
+	//go conn.Ping()
+
 	return
 }
 
-func (c Conn) Close() error {
+func (c *Conn) Close() error {
 	return c.conn.Close()
+}
+
+func (c *Conn) Ping() {
+	ticker := time.NewTicker(pingPeriod)
+	defer func() {
+		ticker.Stop()
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
 }
 
 // The application runs readPump in a per-connection goroutine. The application
@@ -111,32 +129,32 @@ func (c *Conn) writePump() {
 	}
 }
 
-func (c Conn) ReadAll() (b []byte, n int, err error) {
+func (c *Conn) ReadAll() (b []byte, n int, err error) {
 	b = <-c.Recv // block if no data is available
 	n = len(b)
 
 	return
 }
 
-func (c Conn) Write(p []byte) (n int, err error) {
+func (c *Conn) Write(p []byte) (n int, err error) {
 	c.Send <- p
 	n = len(p)
 
 	return
 }
 
-func (c Conn) RelayFrom(src net.Conn) {
+func (c *Conn) RelayFrom(src net.Conn) {
 	buf := leakyBuf.Get()
 	defer leakyBuf.Put(buf)
 	for {
 		if n, err := src.Read(buf); err != nil {
 			//log.Println("Net -> Ws Read: ", n, err)
-			fmt.Sprintf("Ws Read, len: %d, err: %s", n, err)
+			fmt.Sprintf("net Read, len: %d, err: %s", n, err)
 			break
 		} else {
 			if err := c.conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
 				//log.Println("Net -> Ws write:", err)
-				fmt.Sprintf("Net Write, len: %d, err: %s", n, err)
+				fmt.Sprintf("ws Write, len: %d, err: %s", n, err)
 				break
 			}
 		}
@@ -145,10 +163,12 @@ func (c Conn) RelayFrom(src net.Conn) {
 	return
 }
 
-func (c Conn) RelayTo(dst net.Conn) {
+func (c *Conn) RelayTo(dst net.Conn) {
 	for {
 		mt, message, err := c.conn.ReadMessage()
 		if err != nil {
+			log.Println("ws read:", err)
+
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error when reading: %v", err)
 			}
@@ -159,7 +179,7 @@ func (c Conn) RelayTo(dst net.Conn) {
 		}
 
 		if _, err := dst.Write(message); err != nil {
-			log.Println("WS -> Net write:", err)
+			log.Println("net write:", err)
 			break
 		}
 	}
