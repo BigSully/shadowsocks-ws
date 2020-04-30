@@ -141,19 +141,6 @@ func (c Conn) ReadAll() (b []byte, n int, err error) {
 	return
 }
 
-func (c Conn) Read(p []byte) (n int, err error) {
-	bytes := <-c.wsConn.Recv // block if no data is available
-
-	//if r.readIndex >= int64(len(r.data)) {  // how to EOF
-	//	err = io.EOF
-	//	return
-	//}
-
-	n = copy(p, bytes)
-	return
-
-}
-
 func (c Conn) Write(p []byte) (n int, err error) {
 	c.wsConn.Send <- p
 	n = len(p)
