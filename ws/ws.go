@@ -69,7 +69,7 @@ func (c *WSConn) readPump() {
 	}()
 	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		mt, message, err := c.conn.ReadMessage()
+		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("error: %v", err)
@@ -77,9 +77,7 @@ func (c *WSConn) readPump() {
 			break
 		}
 
-		if mt == websocket.BinaryMessage {
-			c.Recv <- message
-		}
+		c.Recv <- message
 	}
 }
 
