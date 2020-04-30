@@ -1,12 +1,11 @@
 package main
 
 import (
-	"github.com/BigSully/shadowsocks-ws/websocket"
 	"io"
 	"net"
 	"time"
 
-	ss "github.com/BigSully/shadowsocks-ws/shadowsocks"
+	"github.com/BigSully/shadowsocks-ws/ws"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
@@ -70,7 +69,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			wsAddr := "ws://localhost:3000/"
 			method := "aes-256-cfb"
 			password := "123456"
-			cipher, err := ss.NewCipher(method, password)
+			cipher, err := ws.NewCipher(method, password)
 
 			//rc, err := net.Dial("tcp", server)
 			wsConn, err := ws.Dial(wsAddr)
@@ -80,7 +79,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 			defer wsConn.Close()
 
-			newConn := ss.NewConn(wsConn, cipher)
+			newConn := ws.NewConn(wsConn, cipher)
 			if err != nil {
 				logger.Println("error connecting to shadowsocks server:", err)
 				return
@@ -172,15 +171,15 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 
 // relay copies between left and right bidirectionally. Returns number of
 // bytes copied from right to left, from left to right, and any error occurred.
-func relayws(left ss.Conn, right net.Conn) {
+func relayws(left ws.Conn, right net.Conn) {
 	type res struct {
 		N   int64
 		Err error
 	}
 	//ch := make(chan res)
 
-	go ss.PipeNet2WS(right, left)
-	ss.PipeWS2Net(left, right)
+	go ws.PipeNet2WS(right, left)
+	ws.PipeWS2Net(left, right)
 	//logger.Println("closed connection to", hostPort)
 
 	//

@@ -1,4 +1,4 @@
-package shadowsocks
+package ws
 
 import (
 	"encoding/json"
