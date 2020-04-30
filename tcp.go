@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/BigSully/shadowsocks-ws/ws"
-	"github.com/gorilla/websocket"
 	"github.com/shadowsocks/go-shadowsocks2/socks"
 )
 
@@ -90,7 +89,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
 			relayws(*conn, c)
-			//relay3(*raw, c)
+			//relay3(*conn, c)
 
 			//if err != nil {
 			//	logf("failed to connect to server %v: %v", server, err)
@@ -164,9 +163,9 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 	}
 }
 
-func relay3(left websocket.Conn, right net.Conn) {
-	go ws.RelayNet2Ws(right, left)
-	ws.RelayWs2Net(left, right)
+func relay3(left ws.Conn, right net.Conn) {
+	go left.RelayFrom(right)
+	left.RelayTo(right)
 }
 
 // relay copies between left and right bidirectionally. Returns number of
@@ -199,33 +198,8 @@ func relay3(left websocket.Conn, right net.Conn) {
 // relay copies between left and right bidirectionally. Returns number of
 // bytes copied from right to left, from left to right, and any error occurred.
 func relayws(left ws.Conn, right net.Conn) {
-	type res struct {
-		N   int64
-		Err error
-	}
-	//ch := make(chan res)
-
 	go ws.PipeNet2WS(right, left)
 	ws.PipeWS2Net(left, right)
-	//logger.Println("closed connection to", hostPort)
-
-	//
-	//go func() {
-	//	n, err := io.Copy(right, left)
-	//	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-	//	//left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-	//	ch <- res{n, err}
-	//}()
-	//
-	//n, err := io.Copy(left, right)
-	//right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-	////left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-	//rs := <-ch
-	//
-	//if err == nil {
-	//	err = rs.Err
-	//}
-	//return n, rs.N, err
 }
 
 // relay copies between left and right bidirectionally. Returns number of

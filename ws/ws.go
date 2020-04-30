@@ -1,7 +1,10 @@
 package ws
 
 import (
+	"fmt"
 	"github.com/gorilla/websocket"
+	"net"
+
 	//"io"
 	"log"
 	"time"
@@ -119,5 +122,46 @@ func (c Conn) Write(p []byte) (n int, err error) {
 	c.Send <- p
 	n = len(p)
 
+	return
+}
+
+func (c Conn) RelayFrom(src net.Conn) {
+	buf := leakyBuf.Get()
+	defer leakyBuf.Put(buf)
+	for {
+		if n, err := src.Read(buf); err != nil {
+			//log.Println("Net -> Ws Read: ", n, err)
+			fmt.Sprintf("Ws Read, len: %d, err: %s", n, err)
+			break
+		} else {
+			if err := c.conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
+				//log.Println("Net -> Ws write:", err)
+				fmt.Sprintf("Net Write, len: %d, err: %s", n, err)
+				break
+			}
+		}
+
+	}
+	return
+}
+
+func (c Conn) RelayTo(dst net.Conn) {
+	for {
+		mt, message, err := c.conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("error when reading: %v", err)
+			}
+			break
+		}
+		if mt != websocket.BinaryMessage {
+			log.Printf("WS -> Net need to deal with message type in error: %v", err)
+		}
+
+		if _, err := dst.Write(message); err != nil {
+			log.Println("WS -> Net write:", err)
+			break
+		}
+	}
 	return
 }
