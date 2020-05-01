@@ -101,30 +101,18 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 // Listen on addr for incoming connections.
 func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		logf("failed to listen on %s: %v", addr, err)
-		return
-	}
-
-	logf("listening TCP on %s", addr)
-	for {
-		c, err := l.Accept()
-		if err != nil {
-			logf("failed to accept: %v", err)
-			continue
-		}
-
+	ws.Listen(func(c *ws.Conn) {
 		go func() {
 			defer c.Close()
-			c.(*net.TCPConn).SetKeepAlive(true)
-			c = shadow(c)
 
-			tgt, err := socks.ReadAddr(c)
+			r, _ := c.ReadAddress()
+			tgt, err := socks.ReadAddr(r)
 			if err != nil {
 				logf("failed to get target address: %v", err)
 				return
 			}
+
+			logf("remote: %v", tgt.String())
 
 			rc, err := net.Dial("tcp", tgt.String())
 			if err != nil {
@@ -134,16 +122,10 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			defer rc.Close()
 			rc.(*net.TCPConn).SetKeepAlive(true)
 
-			logf("proxy %s <-> %s", c.RemoteAddr(), tgt)
-			_, _, err = relay(c, rc)
-			if err != nil {
-				if err, ok := err.(net.Error); ok && err.Timeout() {
-					return // ignore i/o timeout
-				}
-				logf("relay error: %v", err)
-			}
+			//logf("proxy %s <-> %s", c.RemoteAddr(), tgt)  // TODO
+			relayws(*c, rc)
 		}()
-	}
+	})
 }
 
 func relayws(left ws.Conn, right net.Conn) {

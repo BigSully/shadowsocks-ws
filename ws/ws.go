@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"bytes"
 	"encoding/base64"
 	"github.com/gorilla/websocket"
 	"io"
@@ -83,12 +84,22 @@ func (c Conn) Write(p []byte) (n int, err error) {
 	return w.Write(p)
 }
 
-func (c Conn) Read(p []byte) (n int, err error) {
-	_, r, err := c.conn.NextReader()
+//// p might not able to hold all data from r
+//func (c Conn) Read(p []byte) (n int, err error) {
+//	_, r, err := c.conn.NextReader()
+//	if err != nil {
+//		return
+//	}
+//	return r.Read(p)
+//}
+
+func (c Conn) ReadAddress() (r io.Reader, err error) {
+	_, p, err := c.conn.ReadMessage()
 	if err != nil {
 		return
 	}
-	return r.Read(p)
+	r = bytes.NewReader(p)
+	return
 }
 
 func (c *Conn) ReadFrom(src net.Conn) {
@@ -109,5 +120,20 @@ func (c *Conn) WriteTo(dst net.Conn) {
 			log.Println("error write to net:", n, err)
 			break
 		}
+	}
+}
+
+func Listen(handleConnection func(conn *Conn)) {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		var upgrader = websocket.Upgrader{} // use default options
+		c, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		handleConnection(&Conn{conn: c})
+	})
+	if err := http.ListenAndServe(":3000", nil); err != nil {
+		log.Fatal("ListenAndServe: ", err)
 	}
 }
