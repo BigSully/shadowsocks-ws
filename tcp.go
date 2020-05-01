@@ -44,6 +44,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 	urlStr := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.Path)
 	key := u.User.Username()
+	//urlStr="ws://localhost:3000/"
 	fmt.Println(urlStr)
 	fmt.Println(key)
 
@@ -79,7 +80,6 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 
 			conn, err := ws.Dial(urlStr, ws.Auth(key, ""))
-			//conn, err := ws.Dial("ws://localhost:3000/", nil)
 
 			if err != nil {
 				logf("failed to connect to server ", err)
@@ -155,8 +155,12 @@ func relay4(left ws.Conn, right net.Conn) {
 }
 
 func relayws(left ws.Conn, right net.Conn) {
-	go left.ReadFrom(right)
+	go func() {
+		left.ReadFrom(right)
+		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
+	}()
 	left.WriteTo(right)
+	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
 }
 
 // relay copies between left and right bidirectionally. Returns number of
