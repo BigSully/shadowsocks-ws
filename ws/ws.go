@@ -74,12 +74,10 @@ func (c *Conn) WriteAddress(p []byte) (n int, err error) {
 }
 
 func (c *Conn) Write(p []byte) (n int, err error) {
-	w, err := c.conn.NextWriter(websocket.BinaryMessage) // get a writer everytime there is a copy and close it when exit
-	if err != nil {
-		return
-	}
-	defer w.Close()
-	return w.Write(p)
+	err = c.conn.WriteMessage(websocket.BinaryMessage, p)
+	n = len(p)
+
+	return
 }
 
 func (c *Conn) ReadFrom(src net.Conn) {
