@@ -146,14 +146,6 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 	}
 }
 
-func relay4(left ws.Conn, right net.Conn) {
-	//go ws.PipeNet2WS(right, left)
-	////ws.PipeWS2Net(left, right)
-	//
-	////go left.RelayFrom(right)
-	//left.RelayTo(right)
-}
-
 func relayws(left ws.Conn, right net.Conn) {
 	go func() {
 		left.ReadFrom(right)
