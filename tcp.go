@@ -101,7 +101,15 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 // Listen on addr for incoming connections.
 func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
-	ws.Listen(func(c *ws.Conn) {
+	u, err := url.Parse(strings.Trim(addr, "'"))
+	if err != nil {
+		panic(err)
+	}
+
+	//key := u.User.Username()
+	host := u.Host
+
+	ws.Listen(host, func(c *ws.Conn, remoteAddr string) {
 		go func() {
 			defer c.Close()
 
@@ -112,8 +120,6 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 				return
 			}
 
-			logf("remote: %v", tgt.String())
-
 			rc, err := net.Dial("tcp", tgt.String())
 			if err != nil {
 				logf("failed to connect to target: %v", err)
@@ -122,7 +128,7 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 			defer rc.Close()
 			rc.(*net.TCPConn).SetKeepAlive(true)
 
-			//logf("proxy %s <-> %s", c.RemoteAddr(), tgt)  // TODO
+			logf("proxy %s <-> %s", remoteAddr, tgt)
 			relayws(*c, rc)
 		}()
 	})

@@ -23,11 +23,6 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 )
 
-var (
-	newline = []byte{'\n'}
-	space   = []byte{' '}
-)
-
 func Auth(username string, password string) (h http.Header) {
 	h = http.Header{"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))}}
 	return
@@ -123,7 +118,17 @@ func (c *Conn) WriteTo(dst net.Conn) {
 	}
 }
 
-func Listen(handleConnection func(conn *Conn)) {
+func ReadUserIP(r *http.Request) string {
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
+		IPAddress = r.RemoteAddr
+	}
+	return IPAddress
+}
+func Listen(addr string, handleConnection func(conn *Conn, remoteAddr string)) {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var upgrader = websocket.Upgrader{} // use default options
 		c, err := upgrader.Upgrade(w, r, nil)
@@ -131,9 +136,10 @@ func Listen(handleConnection func(conn *Conn)) {
 			log.Println(err)
 			return
 		}
-		handleConnection(&Conn{conn: c})
+		remoteAddr := ReadUserIP(r)
+		handleConnection(&Conn{conn: c}, remoteAddr)
 	})
-	if err := http.ListenAndServe(":3000", nil); err != nil {
+	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
