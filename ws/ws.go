@@ -77,7 +77,7 @@ func (c *Conn) ReadFrom(src net.Conn) {
 	defer leakyBuf.Put(buf)
 	for {
 		if n, err := src.Read(buf); err != nil {
-			log.Println("error read net: ", n, err)
+			log.Println("error read net: ", err)
 			break
 		} else {
 			if err := c.conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {

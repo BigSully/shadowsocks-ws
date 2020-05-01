@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/BigSully/shadowsocks-ws/ws"
@@ -33,6 +36,14 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 		logf("failed to listen on %s: %v", addr, err)
 		return
 	}
+
+	u, err := url.Parse(strings.Trim(server, "'"))
+	if err != nil {
+		panic(err)
+	}
+
+	urlStr := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.Path)
+	key := u.User.Username()
 
 	for {
 		c, err := l.Accept()
@@ -65,7 +76,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 
-			conn, err := ws.Dial("wss://wss2.swiftducks.com/", ws.Auth("ogs9slh2w54", ""))
+			conn, err := ws.Dial(urlStr, ws.Auth(key, ""))
 			//conn, err := ws.Dial("ws://localhost:3000/", nil)
 
 			if err != nil {
