@@ -66,7 +66,8 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			}
 
 			//wsAddr := fmt.Sprintf("ws://%v:%v/", config["server"], config["server_port"])
-			wsAddr := "ws://localhost:3000/"
+			//wsAddr := "ws://localhost:3000/"
+			wsAddr := "wss://wss2.swiftducks.com/"
 			method := "aes-256-cfb"
 			password := "123456"
 			cipher, err := ws.NewCipher(method, password)

@@ -1,9 +1,11 @@
 package ws
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"net"
+	"net/http"
 
 	//"io"
 	"log"
@@ -40,7 +42,9 @@ type Conn struct {
 
 // Dial: addr should be in the form of host:port
 func Dial(addr string, cipher *Cipher) (conn *Conn, err error) {
-	c, _, err := websocket.DefaultDialer.Dial(addr, nil)
+
+	h := http.Header{"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte("ogs9slh2w54"+":"))}}
+	c, _, err := websocket.DefaultDialer.Dial(addr, h)
 	if err != nil {
 		return
 	}
