@@ -73,26 +73,18 @@ func (c *Conn) WriteAddress(p []byte) (n int, err error) {
 	return
 }
 
-type WritterWrapper struct {
-	writer func(p []byte) (n int, err error)
-}
-
-func (w WritterWrapper) Write(p []byte) (n int, err error) {
-	return w.writer(p)
+func (c *Conn) Write(p []byte) (n int, err error) {
+	w, err := c.conn.NextWriter(websocket.BinaryMessage) // get a writer everytime there is a copy and close it when exit
+	if err != nil {
+		return
+	}
+	defer w.Close()
+	return w.Write(p)
 }
 
 func (c *Conn) ReadFrom(src net.Conn) {
-	w := struct{ WritterWrapper }{}
-	w.writer = func(p []byte) (n int, err error) {
-		w, err := c.conn.NextWriter(websocket.BinaryMessage) // get a writer everytime there is a copy and close it when exit
-		if err != nil {
-			return
-		}
-		defer w.Close()
-		return w.Write(p)
-	}
 
-	if n, err := io.Copy(w, src); err != nil { // implicit loop in copy
+	if n, err := io.Copy(c, src); err != nil { // implicit loop in copy
 		log.Println("error copy net to ws:", n, err)
 		return
 	}
