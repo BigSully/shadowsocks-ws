@@ -60,6 +60,7 @@ func (c *Conn) Ping() {
 		case <-ticker.C:
 			if err := c.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait)); err != nil {
 				log.Println("ping:", err)
+				return
 			}
 		}
 	}
@@ -95,7 +96,6 @@ func (c *Conn) ReadFrom(src net.Conn) {
 		log.Println("error copy net to ws:", n, err)
 		return
 	}
-	log.Println("out ------ ")
 }
 
 func (c *Conn) WriteTo(dst net.Conn) {
