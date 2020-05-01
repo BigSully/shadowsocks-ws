@@ -82,6 +82,14 @@ func (c Conn) Write(p []byte) (n int, err error) {
 	return w.Write(p)
 }
 
+func (c Conn) Read(p []byte) (n int, err error) {
+	_, r, err := c.conn.NextReader()
+	if err != nil {
+		return
+	}
+	return r.Read(p)
+}
+
 func (c *Conn) ReadFrom(src net.Conn) {
 
 	if n, err := io.Copy(c, src); err != nil { // implicit loop in copy
@@ -93,19 +101,14 @@ func (c *Conn) ReadFrom(src net.Conn) {
 
 func (c *Conn) WriteTo(dst net.Conn) {
 	for {
-		mt, message, err := c.conn.ReadMessage()
+		_, r, err := c.conn.NextReader()
 		if err != nil {
-			log.Printf("error read from ws: %v", err)
 			break
 		}
-		if mt != websocket.BinaryMessage {
-			log.Printf("error need to deal with message type in error: %v", err)
-		}
 
-		if _, err := dst.Write(message); err != nil {
-			log.Println("error write to net:", err)
+		if n, err := io.Copy(dst, r); err != nil && err != io.EOF { // implicit loop in copy
+			log.Println("error write to net:", n, err)
 			break
 		}
 	}
-	return
 }
