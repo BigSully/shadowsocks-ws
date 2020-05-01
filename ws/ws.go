@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/base64"
 	"github.com/gorilla/websocket"
+	"io"
 	"net"
 	"net/http"
 
@@ -72,22 +73,30 @@ func (c *Conn) WriteAddress(p []byte) (n int, err error) {
 	return
 }
 
-func (c *Conn) ReadFrom(src net.Conn) {
-	buf := leakyBuf.Get()
-	defer leakyBuf.Put(buf)
-	for {
-		if n, err := src.Read(buf); err != nil {
-			log.Println("error read net: ", err)
-			break
-		} else {
-			if err := c.conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
-				log.Println("error write ws:", err)
-				break
-			}
-		}
+type WsWriter struct {
+	writer func(p []byte) (n int, err error)
+}
 
+func (w WsWriter) Write(p []byte) (n int, err error) {
+	return w.writer(p)
+}
+
+func (c *Conn) ReadFrom(src net.Conn) {
+	w := struct{ WsWriter }{}
+	w.writer = func(p []byte) (n int, err error) {
+		w, err := c.conn.NextWriter(websocket.BinaryMessage)
+		if err != nil {
+			return
+		}
+		defer w.Close()
+		return w.Write(p)
 	}
-	return
+
+	if n, err := io.Copy(w, src); err != nil {
+		log.Println("error copy net to ws:", n, err)
+		return
+	}
+	log.Println("out ------ ")
 }
 
 func (c *Conn) WriteTo(dst net.Conn) {

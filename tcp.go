@@ -44,6 +44,8 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 	urlStr := fmt.Sprintf("%s://%s%s", u.Scheme, u.Host, u.Path)
 	key := u.User.Username()
+	fmt.Println(urlStr)
+	fmt.Println(key)
 
 	for {
 		c, err := l.Accept()
