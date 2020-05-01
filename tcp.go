@@ -65,17 +65,11 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 
-			//wsAddr := fmt.Sprintf("ws://%v:%v/", config["server"], config["server_port"])
-			//wsAddr := "ws://localhost:3000/"
-			wsAddr := "wss://wss2.swiftducks.com/"
-			method := "aes-256-cfb"
-			password := "123456"
-			cipher, err := ws.NewCipher(method, password)
+			conn, err := ws.Dial("wss://wss2.swiftducks.com/", ws.Auth("ogs9slh2w54", ""))
+			//conn, err := ws.Dial("ws://localhost:3000/", nil)
 
-			//rc, err := net.Dial("tcp", server)
-			conn, err := ws.Dial(wsAddr, cipher)
 			if err != nil {
-				logf("failed to connect to server2 %v: %v", wsAddr, err)
+				logf("failed to connect to server ", err)
 				return
 			}
 			defer conn.Close()
@@ -84,13 +78,17 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 			//rc = shadow(rc)   // TODO: encryption  can be skipped for the moment
 
 			// tell the distant server the real server we want to access and help the distant server initialize a new connection
-			if _, err = conn.Write(tgt); err != nil {
+			//if _, err = conn.Write(tgt); err != nil {
+			//	return
+			//}
+
+			if _, err = conn.WriteAddress(tgt); err != nil {
 				return
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			relayws(*conn, c)
-			//relay3(*conn, c)
+			//relayws(*conn, c)
+			relay3(*conn, c)
 
 			//if err != nil {
 			//	logf("failed to connect to server %v: %v", server, err)
@@ -164,6 +162,14 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 	}
 }
 
+func relay4(left ws.Conn, right net.Conn) {
+	//go ws.PipeNet2WS(right, left)
+	////ws.PipeWS2Net(left, right)
+	//
+	////go left.RelayFrom(right)
+	//left.RelayTo(right)
+}
+
 func relay3(left ws.Conn, right net.Conn) {
 	go left.RelayFrom(right)
 	left.RelayTo(right)
@@ -199,8 +205,8 @@ func relay3(left ws.Conn, right net.Conn) {
 // relay copies between left and right bidirectionally. Returns number of
 // bytes copied from right to left, from left to right, and any error occurred.
 func relayws(left ws.Conn, right net.Conn) {
-	go ws.PipeNet2WS(right, left)
-	ws.PipeWS2Net(left, right)
+	//go ws.PipeNet2WS(right, left)
+	//ws.PipeWS2Net(left, right)
 }
 
 // relay copies between left and right bidirectionally. Returns number of

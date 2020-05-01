@@ -2,12 +2,10 @@ package ws
 
 import (
 	"encoding/base64"
-	"fmt"
 	"github.com/gorilla/websocket"
 	"net"
 	"net/http"
 
-	//"io"
 	"log"
 	"time"
 )
@@ -28,37 +26,25 @@ var (
 	space   = []byte{' '}
 )
 
+func Auth(username string, password string) (h http.Header) {
+	h = http.Header{"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))}}
+	return
+}
+
 type Conn struct {
 	conn *websocket.Conn
-
-	// Buffered channel of outbound messages.
-	Send chan []byte
-
-	// Buffered channel of inbound messages.
-	Recv chan []byte
-
-	*Cipher
 }
 
 // Dial: addr should be in the form of host:port
-func Dial(addr string, cipher *Cipher) (conn *Conn, err error) {
-
-	h := http.Header{"Authorization": {"Basic " + base64.StdEncoding.EncodeToString([]byte("ogs9slh2w54"+":"))}}
-	c, _, err := websocket.DefaultDialer.Dial(addr, h)
+func Dial(urlStr string, h http.Header) (conn *Conn, err error) {
+	c, _, err := websocket.DefaultDialer.Dial(urlStr, h)
 	if err != nil {
 		return
 	}
 
-	conn = &Conn{
-		conn:   c,
-		Send:   make(chan []byte, 256),
-		Recv:   make(chan []byte, 256),
-		Cipher: cipher}
+	conn = &Conn{conn: c}
 
-	go conn.writePump()
-	go conn.readPump()
-
-	//go conn.Ping()
+	go conn.ping()
 
 	return
 }
@@ -67,82 +53,23 @@ func (c *Conn) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Conn) Ping() {
+func (c *Conn) ping() {
 	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-	}()
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
+			if err := c.conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(writeWait)); err != nil {
+				log.Println("ping:", err)
 			}
 		}
 	}
 }
 
-// The application runs readPump in a per-connection goroutine. The application
-// ensures that there is at most one reader on a connection by executing all
-// reads from this goroutine.
-func (c *Conn) readPump() {
-	defer func() {
-		c.conn.Close()
-	}()
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
-	for {
-		_, message, err := c.conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error: %v", err)
-			}
-			break
-		}
-
-		c.Recv <- message
+func (c *Conn) WriteAddress(p []byte) (n int, err error) {
+	if err := c.conn.WriteMessage(websocket.BinaryMessage, p); err != nil {
+		log.Println("Net -> Ws write:", err)
 	}
-}
-
-// A goroutine running writePump is started for each connection. The
-// application ensures that there is at most one writer to a connection by
-// executing all writes from this goroutine.
-func (c *Conn) writePump() {
-	ticker := time.NewTicker(pingPeriod)
-	defer func() {
-		ticker.Stop()
-		c.conn.Close()
-	}()
-	for {
-		select {
-		case message, ok := <-c.Send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if !ok {
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-			if err := c.conn.WriteMessage(websocket.BinaryMessage, message); err != nil {
-				return
-			}
-		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
-	}
-}
-
-func (c *Conn) ReadAll() (b []byte, n int, err error) {
-	b = <-c.Recv // block if no data is available
-	n = len(b)
-
-	return
-}
-
-func (c *Conn) Write(p []byte) (n int, err error) {
-	c.Send <- p
-	n = len(p)
 
 	return
 }
@@ -152,13 +79,11 @@ func (c *Conn) RelayFrom(src net.Conn) {
 	defer leakyBuf.Put(buf)
 	for {
 		if n, err := src.Read(buf); err != nil {
-			//log.Println("Net -> Ws Read: ", n, err)
-			fmt.Sprintf("net Read, len: %d, err: %s", n, err)
+			log.Println("error read net: ", n, err)
 			break
 		} else {
 			if err := c.conn.WriteMessage(websocket.BinaryMessage, buf[:n]); err != nil {
-				//log.Println("Net -> Ws write:", err)
-				fmt.Sprintf("ws Write, len: %d, err: %s", n, err)
+				log.Println("error write ws:", err)
 				break
 			}
 		}
@@ -174,16 +99,16 @@ func (c *Conn) RelayTo(dst net.Conn) {
 			log.Println("ws read:", err)
 
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error when reading: %v", err)
+				log.Printf("error read from ws: %v", err)
 			}
 			break
 		}
 		if mt != websocket.BinaryMessage {
-			log.Printf("WS -> Net need to deal with message type in error: %v", err)
+			log.Printf("error need to deal with message type in error: %v", err)
 		}
 
 		if _, err := dst.Write(message); err != nil {
-			log.Println("net write:", err)
+			log.Println("error write to net:", err)
 			break
 		}
 	}
