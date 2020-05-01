@@ -66,7 +66,7 @@ func (c *Conn) Ping() {
 
 func (c *Conn) WriteAddress(p []byte) (n int, err error) {
 	if err := c.conn.WriteMessage(websocket.BinaryMessage, p); err != nil {
-		log.Println("Net -> Ws write:", err)
+		log.Println("error write address:", err)
 	}
 
 	return
