@@ -91,7 +91,6 @@ func (c Conn) Read(p []byte) (n int, err error) {
 }
 
 func (c *Conn) ReadFrom(src net.Conn) {
-
 	if n, err := io.Copy(c, src); err != nil { // implicit loop in copy
 		log.Println("error copy net to ws:", n, err)
 		return
