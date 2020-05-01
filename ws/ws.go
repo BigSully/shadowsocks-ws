@@ -73,11 +73,13 @@ func (c *Conn) WriteAddress(p []byte) (n int, err error) {
 	return
 }
 
-func (c *Conn) Write(p []byte) (n int, err error) {
-	err = c.conn.WriteMessage(websocket.BinaryMessage, p)
-	n = len(p)
-
-	return
+func (c Conn) Write(p []byte) (n int, err error) {
+	w, err := c.conn.NextWriter(websocket.BinaryMessage) // get a writer everytime there is a copy and close it when exit
+	if err != nil {
+		return
+	}
+	defer w.Close()
+	return w.Write(p)
 }
 
 func (c *Conn) ReadFrom(src net.Conn) {
@@ -93,11 +95,7 @@ func (c *Conn) WriteTo(dst net.Conn) {
 	for {
 		mt, message, err := c.conn.ReadMessage()
 		if err != nil {
-			log.Println("ws read:", err)
-
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error read from ws: %v", err)
-			}
+			log.Printf("error read from ws: %v", err)
 			break
 		}
 		if mt != websocket.BinaryMessage {
