@@ -44,8 +44,6 @@ func Dial(urlStr string, h http.Header) (conn *Conn, err error) {
 
 	conn = &Conn{conn: c}
 
-	go conn.ping()
-
 	return
 }
 
@@ -53,7 +51,7 @@ func (c *Conn) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Conn) ping() {
+func (c *Conn) Ping() {
 	ticker := time.NewTicker(pingPeriod)
 	defer ticker.Stop()
 	for {
@@ -74,7 +72,7 @@ func (c *Conn) WriteAddress(p []byte) (n int, err error) {
 	return
 }
 
-func (c *Conn) RelayFrom(src net.Conn) {
+func (c *Conn) ReadFrom(src net.Conn) {
 	buf := leakyBuf.Get()
 	defer leakyBuf.Put(buf)
 	for {
@@ -92,7 +90,7 @@ func (c *Conn) RelayFrom(src net.Conn) {
 	return
 }
 
-func (c *Conn) RelayTo(dst net.Conn) {
+func (c *Conn) WriteTo(dst net.Conn) {
 	for {
 		mt, message, err := c.conn.ReadMessage()
 		if err != nil {

@@ -73,44 +73,15 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 				return
 			}
 			defer conn.Close()
-
-			//rc.(*net.TCPConn).SetKeepAlive(true)  // TODO: pinging
-			//rc = shadow(rc)   // TODO: encryption  can be skipped for the moment
-
-			// tell the distant server the real server we want to access and help the distant server initialize a new connection
-			//if _, err = conn.Write(tgt); err != nil {
-			//	return
-			//}
+			go conn.Ping()
 
 			if _, err = conn.WriteAddress(tgt); err != nil {
 				return
 			}
 
 			logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			//relayws(*conn, c)
-			relay3(*conn, c)
 
-			//if err != nil {
-			//	logf("failed to connect to server %v: %v", server, err)
-			//	return
-			//}
-			//defer rc.Close()
-			//rc.(*net.TCPConn).SetKeepAlive(true)
-			//rc = shadow(rc)
-			//
-			//if _, err = rc.Write(tgt); err != nil {
-			//	logf("failed to send target address: %v", err)
-			//	return
-			//}
-			//
-			//logf("proxy %s <-> %s <-> %s", c.RemoteAddr(), server, tgt)
-			//_, _, err = relay(rc, c)
-			//if err != nil {
-			//	if err, ok := err.(net.Error); ok && err.Timeout() {
-			//		return // ignore i/o timeout
-			//	}
-			//	logf("relay error: %v", err)
-			//}
+			relayws(*conn, c)
 		}()
 	}
 }
@@ -170,43 +141,9 @@ func relay4(left ws.Conn, right net.Conn) {
 	//left.RelayTo(right)
 }
 
-func relay3(left ws.Conn, right net.Conn) {
-	go left.RelayFrom(right)
-	left.RelayTo(right)
-}
-
-// relay copies between left and right bidirectionally. Returns number of
-//// bytes copied from right to left, from left to right, and any error occurred.
-//func relay2(left ws.Conn, right net.Conn) (int64, int64, error) {
-//	type res struct {
-//		N   int64
-//		Err error
-//	}
-//	ch := make(chan res)
-//
-//	go func() {
-//		n, err := io.Copy(right, left)
-//		right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-//		//left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-//		ch <- res{n, err}
-//	}()
-//
-//	n, err := io.Copy(left, right)
-//	right.SetDeadline(time.Now()) // wake up the other goroutine blocking on right
-//	//left.SetDeadline(time.Now())  // wake up the other goroutine blocking on left
-//	rs := <-ch
-//
-//	if err == nil {
-//		err = rs.Err
-//	}
-//	return n, rs.N, err
-//}
-
-// relay copies between left and right bidirectionally. Returns number of
-// bytes copied from right to left, from left to right, and any error occurred.
 func relayws(left ws.Conn, right net.Conn) {
-	//go ws.PipeNet2WS(right, left)
-	//ws.PipeWS2Net(left, right)
+	go left.ReadFrom(right)
+	left.WriteTo(right)
 }
 
 // relay copies between left and right bidirectionally. Returns number of
