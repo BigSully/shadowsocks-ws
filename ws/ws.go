@@ -106,7 +106,7 @@ func (c *Conn) WriteTo(dst net.Conn) {
 			break
 		}
 
-		if n, err := io.Copy(dst, r); err != nil && err != io.EOF { // implicit loop in copy
+		if n, err := io.Copy(dst, r); err != nil { // implicit loop in copy
 			log.Println("error write to net:", n, err)
 			break
 		}
