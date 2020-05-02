@@ -3,6 +3,7 @@ package ws
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"github.com/gorilla/websocket"
 	"io"
 	"net"
@@ -92,6 +93,9 @@ func (c Conn) ReadAddress() (r io.Reader, err error) {
 	_, p, err := c.conn.ReadMessage()
 	if err != nil {
 		return
+	}
+	if len(p) == 0 {
+		return nil, errors.New("-----------------cannot read address-----------------")
 	}
 	r = bytes.NewReader(p)
 	return

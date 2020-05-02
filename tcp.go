@@ -113,7 +113,12 @@ func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
 		go func() {
 			defer c.Close()
 
-			r, _ := c.ReadAddress()
+			r, err := c.ReadAddress()
+			if err != nil {
+				logf("error to read target address: %v", err)
+				return
+			}
+
 			tgt, err := socks.ReadAddr(r)
 			if err != nil {
 				logf("failed to get target address: %v", err)
