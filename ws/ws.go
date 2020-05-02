@@ -94,9 +94,6 @@ func (c Conn) ReadAddress() (r io.Reader, err error) {
 	if err != nil {
 		return
 	}
-	if len(p) == 0 {
-		return nil, errors.New("-----------------cannot read address-----------------")
-	}
 	r = bytes.NewReader(p)
 	return
 }
