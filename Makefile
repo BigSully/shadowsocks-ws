@@ -3,7 +3,13 @@ BINDIR=bin
 GOBUILD=CGO_ENABLED=0 go build -ldflags '-w -s'
 # The -w and -s flags reduce binary sizes by excluding unnecessary symbols and debug info
 
-all: linux macos win64 win32
+all: arm linux macos win64 win32
+
+# cubietrunk plus, CPU: ARMCortex A7, arch: ARMv7-A
+# raspberry pi 3B+, CPU: ARM Cortex-A53,  arch: ARMv8-A
+.PHONY: arm
+arm:
+	GOARCH=arm GOARM=7 GOOS=linux $(GOBUILD) -o $(BINDIR)/$(NAME)-$@
 
 linux:
 	GOARCH=amd64 GOOS=linux $(GOBUILD) -o $(BINDIR)/$(NAME)-$@

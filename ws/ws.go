@@ -3,7 +3,6 @@ package ws
 import (
 	"bytes"
 	"encoding/base64"
-	"errors"
 	"github.com/gorilla/websocket"
 	"io"
 	"net"
