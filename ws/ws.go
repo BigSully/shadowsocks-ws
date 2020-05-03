@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"strings"
 
 	"log"
 	"time"
@@ -134,7 +136,20 @@ func Listen(addr string, handleConnection func(conn *Conn, remoteAddr string)) {
 		w.Write([]byte("Hello world!"))
 	})
 	http.HandleFunc("/ip", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(ReadUserIP(r)))
+		s := []string{}
+		s = append(s, r.Header.Get("X-Real-Ip"))
+		s = append(s, r.Header.Get("X-Forwarded-For"))
+		s = append(s, r.RemoteAddr)
+		result := strings.Join(s, ", ")
+		w.Write([]byte(result))
+	})
+	http.HandleFunc("/headers", func(w http.ResponseWriter, r *http.Request) {
+		b, err := httputil.DumpRequest(r, false)
+		if err != nil {
+			w.Write([]byte("Failed to dump request!"))
+			return
+		}
+		w.Write([]byte(b))
 	})
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
