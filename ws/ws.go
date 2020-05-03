@@ -128,7 +128,15 @@ func ReadUserIP(r *http.Request) string {
 	}
 	return IPAddress
 }
+
 func Listen(addr string, handleConnection func(conn *Conn, remoteAddr string)) {
+	http.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Hello world!"))
+	})
+	http.HandleFunc("/ip", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(ReadUserIP(r)))
+	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		var upgrader = websocket.Upgrader{} // use default options
 		c, err := upgrader.Upgrade(w, r, nil)
